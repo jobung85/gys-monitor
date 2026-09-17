@@ -8,7 +8,6 @@ Live site: **https://jobung85.github.io/gys-monitor/**
 - Thumbnail for each video
 - Date / type / search filters
 - “New” highlighting after you mark the current list as seen
-- **Collect in Troopermonitor** — copies the video URL and, if Troopermonitor is installed on this PC, opens the app with that video queued
 
 TikTok does not expose a public feed to browsers. The hosted page ships with the catalog in `videos.json`. To refresh it on your computer:
 

@@ -1,0 +1,13 @@
+# Never commit local runtime state or tokens
+app_settings.json
+tiktok_config.json
+tiktok_storage_state.json
+wa_config.json
+trooper_accounts.json
+browser_profile/
+*.lock
+.env
+# Build / cache
+artifact.html
+__pycache__/
+*.pyc

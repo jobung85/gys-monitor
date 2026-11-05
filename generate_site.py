@@ -548,6 +548,31 @@ function writeLast() {
   try { localStorage.setItem(LAST_KEY, new Date().toISOString()); } catch (e) {}
 }
 
+function pad2(n) { return String(n).padStart(2, "0"); }
+
+function isoLocal(d) {
+  return d.getFullYear() + "-" + pad2(d.getMonth() + 1) + "-" + pad2(d.getDate());
+}
+
+/** Viewer's local calendar date (YYYY-MM-DD). Never bake build-time dates into filters. */
+function todayLocal() { return isoLocal(new Date()); }
+
+function yearStartLocal(year) { return year + "-01-01"; }
+
+function addDaysLocal(iso, delta) {
+  const [y, m, d] = iso.split("-").map(Number);
+  const dt = new Date(y, m - 1, d);
+  dt.setDate(dt.getDate() + delta);
+  return isoLocal(dt);
+}
+
+function monthBounds(ym) {
+  const [y, m] = ym.split("-").map(Number);
+  const start = y + "-" + pad2(m) + "-01";
+  const end = isoLocal(new Date(y, m, 0));
+  return { start: start, end: end };
+}
+
 function fmtDay(iso) {
   const [y, m, d] = iso.split("-");
   const dt = new Date(Number(y), Number(m) - 1, Number(d));
@@ -564,18 +589,60 @@ function uniqueMonths(list) {
   return out;
 }
 
-function applyPreset(name) {
-  const today = "2026-09-17";
+function syncDateBounds() {
   const from = $("from");
   const to = $("to");
-  if (name === "all") { from.value = "2026-01-01"; to.value = today; }
-  if (name === "7") { from.value = "2026-09-10"; to.value = today; }
-  if (name === "30") { from.value = "2026-08-18"; to.value = today; }
-  if (name === "sep") { from.value = "2026-09-01"; to.value = today; }
-  if (name === "jul") { from.value = "2026-07-01"; to.value = "2026-07-31"; }
+  const today = todayLocal();
+  const dates = videos.map((v) => v.date).filter(Boolean).sort();
+  const min = dates.length ? dates[0] : yearStartLocal(new Date().getFullYear());
+  from.min = min;
+  to.min = min;
+  from.max = today;
+  to.max = today;
+}
+
+function buildMonthChips() {
+  const host = $("presets");
+  if (!host) return;
+  host.querySelectorAll('.chip[data-preset^="m:"]').forEach((c) => c.remove());
+  for (const ym of uniqueMonths(videos)) {
+    const sample = videos.find((v) => v.month === ym);
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "chip";
+    btn.dataset.preset = "m:" + ym;
+    btn.setAttribute("aria-pressed", "false");
+    btn.textContent = sample && sample.month_name ? sample.month_name : ym;
+    btn.addEventListener("click", () => applyPreset(btn.dataset.preset));
+    host.appendChild(btn);
+  }
+}
+
+function applyPreset(name) {
+  const today = todayLocal();
+  const year = new Date().getFullYear();
+  const from = $("from");
+  const to = $("to");
+  syncDateBounds();
+  if (name === "all") {
+    from.value = yearStartLocal(year);
+    to.value = today;
+  } else if (name === "7") {
+    from.value = addDaysLocal(today, -6);
+    to.value = today;
+  } else if (name === "30") {
+    from.value = addDaysLocal(today, -29);
+    to.value = today;
+  } else if (name && name.indexOf("m:") === 0) {
+    const bounds = monthBounds(name.slice(2));
+    from.value = bounds.start;
+    to.value = bounds.end > today ? today : bounds.end;
+  }
   document.querySelectorAll(".chip").forEach((c) => {
     c.setAttribute("aria-pressed", c.dataset.preset === name ? "true" : "false");
   });
+  const yearChip = document.querySelector('.chip[data-preset="all"]');
+  if (yearChip) yearChip.textContent = "This year (" + year + ")";
   render();
 }
 
@@ -610,7 +677,7 @@ function render() {
   $("countShown").textContent = String(rows.length);
   $("countNew").textContent = firstVisit ? "—" : String(videos.filter((v) => !seen.has(v.id)).length);
   $("latest").textContent = newest ? newest.date : "—";
-  $("built").textContent = (CATALOG && CATALOG.builtAt) ? CATALOG.builtAt : "2026-09-17";
+  $("built").textContent = (CATALOG && CATALOG.builtAt) ? CATALOG.builtAt : "—";
   const last = readLast();
   $("lastVisit").textContent = last ? last.slice(0, 16).replace("T", " ") : "first visit";
 
@@ -622,7 +689,7 @@ function render() {
   } else if (firstVisit) {
     banner.hidden = false;
     banner.dataset.kind = "ok";
-    banner.textContent = "First visit. The 2026 catalog is loaded. Click “Mark current as seen” so the next new post lights up.";
+    banner.textContent = "First visit. The catalog is loaded. Click “Mark current as seen” so the next new post lights up.";
   } else {
     const n = videos.filter((v) => !seen.has(v.id)).length;
     if (n) {
@@ -755,6 +822,7 @@ async function tryLiveJson() {
       liveNote = added.length
         ? ("Live file updated: " + added.length + " new video" + (added.length === 1 ? "" : "s") + ".")
         : "No new videos in the local catalog.";
+      buildMonthChips();
       render();
       return true;
     }
@@ -782,6 +850,8 @@ function bind() {
   document.querySelectorAll(".chip").forEach((c) => {
     c.addEventListener("click", () => applyPreset(c.dataset.preset));
   });
+  syncDateBounds();
+  buildMonthChips();
   applyPreset("all");
   tryLiveJson();
 }
@@ -835,10 +905,10 @@ BODY = """
         <input id="q" type="search" placeholder="Roh Kudus, Sabat, baptis…" autocomplete="off">
       </label>
       <label>From
-        <input id="from" type="date" value="2026-01-01" min="2026-01-01" max="2026-09-17">
+        <input id="from" type="date" value="" min="" max="">
       </label>
       <label>To
-        <input id="to" type="date" value="2026-09-17" min="2026-01-01" max="2026-09-17">
+        <input id="to" type="date" value="" min="" max="">
       </label>
       <label>Type
         <select id="type">
@@ -851,12 +921,10 @@ BODY = """
         <input id="onlyNew" type="checkbox"> New only
       </label>
     </div>
-    <div class="presets" role="group" aria-label="Date presets">
-      <button type="button" class="chip" data-preset="all" aria-pressed="true">All 2026</button>
+    <div class="presets" id="presets" role="group" aria-label="Date presets">
+      <button type="button" class="chip" data-preset="all" aria-pressed="true">This year</button>
       <button type="button" class="chip" data-preset="7" aria-pressed="false">Last 7 days</button>
       <button type="button" class="chip" data-preset="30" aria-pressed="false">Last 30 days</button>
-      <button type="button" class="chip" data-preset="sep" aria-pressed="false">September</button>
-      <button type="button" class="chip" data-preset="jul" aria-pressed="false">July</button>
     </div>
     <div class="actions">
       <button type="button" class="primary" id="markSeen">Mark current as seen</button>
@@ -866,11 +934,11 @@ BODY = """
   </section>
 
   <div class="meta-line">
-    <span>Catalog built <span id="built">2026-09-17</span> · last marked <span id="lastVisit">—</span></span>
+    <span>Catalog built <span id="built">—</span> · last marked <span id="lastVisit">—</span></span>
     <span>Copy a card link, or open the video</span>
   </div>
   <div id="list" class="list"></div>
-  <p class="note">TikTok does not expose a public feed to browsers, so this page ships with the 1 Jan–16 Sep 2026 catalog. “Scan now” reloads a local <code>videos.json</code> when you run the watcher on your computer; on the hosted page it cannot reach TikTok, so use “Open TikTok profile” or ask to refresh the catalog. Comment collection and WhatsApp still run on the PC, not on this website. Your seen-list stays in this browser only.</p>
+  <p class="note">TikTok does not expose a public feed to browsers, so this page ships with the catalog in <code>videos.json</code>. Date filters default to 1 January of the current year through today (your local date). “Scan now” reloads that file when you run the watcher on your computer; on the hosted page it cannot reach TikTok, so use “Open TikTok profile” or wait for the scheduled refresh. Comment collection and WhatsApp still run on the PC, not on this website. Your seen-list stays in this browser only.</p>
 </div>
 """
 

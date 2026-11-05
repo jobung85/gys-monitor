@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 
 DIR = Path(__file__).resolve().parent
@@ -365,6 +366,26 @@ input:focus, select:focus, button:focus-visible {
   border-color: var(--sky);
   box-shadow: 0 0 0 1px color-mix(in srgb, var(--sky) 25%, transparent);
 }
+.item.is-unavailable {
+  opacity: 0.55;
+  filter: grayscale(0.85);
+  border-color: #cbd5e1;
+  box-shadow: none;
+}
+.item.is-unavailable .thumb img {
+  filter: grayscale(1) brightness(0.9);
+}
+.item.is-unavailable .body h2 a {
+  color: #64748b;
+  text-decoration: line-through;
+  text-decoration-thickness: 1px;
+}
+.flag.unavailable {
+  border-color: #94a3b8;
+  background: #e2e8f0;
+  color: #334155;
+  letter-spacing: 0.08em;
+}
 .thumb {
   position: relative;
   display: block;
@@ -646,12 +667,17 @@ function applyPreset(name) {
   render();
 }
 
+function isUnavailable(v) {
+  return v && v.available === false;
+}
+
 function filtered() {
   const q = $("q").value.trim().toLowerCase();
   const from = $("from").value || "0000-01-01";
   const to = $("to").value || "9999-12-31";
   const type = $("type").value;
   const onlyNew = $("onlyNew").checked;
+  const hideUnavailable = $("hideUnavailable") ? $("hideUnavailable").checked : false;
   const seen = new Set(readSeen());
   const firstVisit = seen.size === 0;
   return videos.filter((v) => {
@@ -663,7 +689,9 @@ function filtered() {
     }
     const isNew = !firstVisit && !seen.has(v.id);
     if (onlyNew && !isNew) return false;
+    if (hideUnavailable && isUnavailable(v)) return false;
     v._new = isNew;
+    v._unavailable = isUnavailable(v);
     return true;
   });
 }
@@ -676,6 +704,9 @@ function render() {
   $("countAll").textContent = String(videos.length);
   $("countShown").textContent = String(rows.length);
   $("countNew").textContent = firstVisit ? "—" : String(videos.filter((v) => !seen.has(v.id)).length);
+  if ($("countUnavailable")) {
+    $("countUnavailable").textContent = String(videos.filter((v) => isUnavailable(v)).length);
+  }
   $("latest").textContent = newest ? newest.date : "—";
   $("built").textContent = (CATALOG && CATALOG.builtAt) ? CATALOG.builtAt : "—";
   const last = readLast();
@@ -712,7 +743,7 @@ function render() {
   }
   for (const v of rows) {
     const card = document.createElement("article");
-    card.className = "item" + (v._new ? " is-new" : "");
+    card.className = "item" + (v._new ? " is-new" : "") + (v._unavailable ? " is-unavailable" : "");
     const thumb = document.createElement("a");
     thumb.className = "thumb";
     thumb.href = v.url;
@@ -743,6 +774,15 @@ function render() {
       f.className = "flag new";
       f.textContent = "New release";
       flags.appendChild(f);
+    }
+    if (v._unavailable) {
+      const u = document.createElement("span");
+      u.className = "flag unavailable";
+      u.textContent = "Unavailable";
+      u.title = v.unavailableSince
+        ? ("Unavailable since " + v.unavailableSince)
+        : "This TikTok is deleted, private, or otherwise unavailable";
+      flags.appendChild(u);
     }
     const k = document.createElement("span");
     k.className = "flag " + (v.type === "Kenalan Yuk" ? "kind-kenalan" : "kind-qa");
@@ -836,6 +876,7 @@ function bind() {
   $("to").addEventListener("change", render);
   $("type").addEventListener("change", render);
   $("onlyNew").addEventListener("change", render);
+  if ($("hideUnavailable")) $("hideUnavailable").addEventListener("change", render);
   $("markSeen").addEventListener("click", markSeen);
   $("openProfile").addEventListener("click", () => {
     window.open("https://www.tiktok.com/@gerejayesussejati", "_blank", "noopener");
@@ -893,6 +934,7 @@ BODY = """
         <div class="stat"><b id="countAll">0</b><span>Detected videos</span></div>
         <div class="stat"><b id="countNew">0</b><span>New releases</span></div>
         <div class="stat"><b id="countShown">0</b><span>Showing</span></div>
+        <div class="stat"><b id="countUnavailable">0</b><span>Unavailable</span></div>
         <div class="stat"><b id="latest">—</b><span>Latest post</span></div>
       </div>
       <div id="banner" class="banner" hidden></div>
@@ -920,6 +962,9 @@ BODY = """
       <label style="flex-direction:row;align-items:center;gap:8px;letter-spacing:0;text-transform:none;font-family:var(--sans);font-size:14px;color:var(--ink);padding-bottom:8px;">
         <input id="onlyNew" type="checkbox"> New only
       </label>
+      <label style="flex-direction:row;align-items:center;gap:8px;letter-spacing:0;text-transform:none;font-family:var(--sans);font-size:14px;color:var(--ink);padding-bottom:8px;">
+        <input id="hideUnavailable" type="checkbox"> Hide unavailable
+      </label>
     </div>
     <div class="presets" id="presets" role="group" aria-label="Date presets">
       <button type="button" class="chip" data-preset="all" aria-pressed="true">This year</button>
@@ -938,7 +983,7 @@ BODY = """
     <span>Copy a card link, or open the video</span>
   </div>
   <div id="list" class="list"></div>
-  <p class="note">TikTok does not expose a public feed to browsers, so this page ships with the catalog in <code>videos.json</code>. Date filters default to 1 January of the current year through today (your local date). “Scan now” reloads that file when you run the watcher on your computer; on the hosted page it cannot reach TikTok, so use “Open TikTok profile” or wait for the scheduled refresh. Comment collection and WhatsApp still run on the PC, not on this website. Your seen-list stays in this browser only.</p>
+  <p class="note">TikTok does not expose a public feed to browsers, so this page ships with the catalog in <code>videos.json</code>. Date filters default to 1 January of the current year through today (your local date). “Scan now” reloads that file when you run the watcher on your computer; on the hosted page it cannot reach TikTok, so use “Open TikTok profile” or wait for the scheduled refresh. Videos marked Unavailable were confirmed gone on TikTok by the scheduled refresh (deleted, private, or blocked). Comment collection and WhatsApp still run on the PC, not on this website. Your seen-list stays in this browser only.</p>
 </div>
 """
 
@@ -981,6 +1026,20 @@ def local_html() -> str:
 
 
 def main() -> None:
+    global DATA, EMBED
+    # Run availability check in GitHub Actions (or when GYS_RUN_AVAIL=1).
+    # Hooked here so the existing "Rebuild site" step picks it up without a
+    # workflow-file edit. Local `python generate_site.py` stays fast.
+    run_avail = os.environ.get("GYS_RUN_AVAIL") == "1" or os.environ.get("GITHUB_ACTIONS") == "true"
+    if run_avail and os.environ.get("GYS_SKIP_AVAIL") != "1":
+        try:
+            from check_availability import main as avail_main
+
+            avail_main([])
+        except Exception as exc:  # noqa: BLE001 — never block the site rebuild
+            print(f"availability check failed (continuing): {exc}")
+    DATA = json.loads((DIR / "videos.json").read_text(encoding="utf-8"))
+    EMBED = json.dumps(DATA, ensure_ascii=False)
     (DIR / "index.html").write_text(local_html(), encoding="utf-8")
     (DIR / "artifact.html").write_text(artifact_html(), encoding="utf-8")
     print("wrote", DIR / "index.html")

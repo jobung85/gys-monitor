@@ -20,7 +20,11 @@
       "type": "Other",
       "reply_to": "",
       "thumbnail": "thumbs/7704548917362330900.jpg",
-      "no": 1
+      "no": 1,
+      "lastChecked": "2026-11-05T11:27:10Z",
+      "available": true,
+      "unavailableSince": null,
+      "unavailableStreak": 0
     },
     {
       "date": "2026-11-04",
@@ -35,7 +39,12 @@
       "type": "Other",
       "reply_to": "",
       "thumbnail": "thumbs/7704280764917058836.jpg",
-      "no": 2
+      "no": 2,
+      "lastChecked": "2026-11-05T11:27:10Z",
+      "unavailableStreak": 2,
+      "availabilityReason": "statusCode=10204 statusMsg='status_deleted' via=video-detail",
+      "unavailableSince": "2026-11-05T11:25:08Z",
+      "available": false
     },
     {
       "date": "2026-10-28",
@@ -65,7 +74,12 @@
       "type": "Q&A Reply",
       "reply_to": "Ruro",
       "thumbnail": "thumbs/7700868891966295297.jpg",
-      "no": 4
+      "no": 4,
+      "lastChecked": "2026-11-05T11:27:10Z",
+      "unavailableStreak": 2,
+      "availabilityReason": "statusCode=10204 statusMsg='status_deleted' via=video-detail",
+      "unavailableSince": "2026-11-05T11:25:08Z",
+      "available": false
     },
     {
       "date": "2026-10-23",
@@ -1162,5 +1176,6 @@
       "no": 77,
       "thumbnail": "thumbs/7590725043106123029.jpg"
     }
-  ]
+  ],
+  "availabilityCheckedAt": "2026-11-05T11:27:10Z"
 }
